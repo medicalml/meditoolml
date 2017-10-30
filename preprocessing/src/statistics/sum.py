@@ -1,5 +1,3 @@
-from .decimalize import decimalize
-
 def sum(data):
     """
     This function returns the sum of numerical values in a data set.

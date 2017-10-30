@@ -1,9 +1,9 @@
 # I need sane division that returns a float not int
 from __future__ import division
 
-from decimalize import decimalize
 from common_statistic import mean
-from sum import sum
+from decimalize import decimalize
+from preprocessing.src.statistics.sum import sum
 
 def kurtosis(x):
     """
