@@ -42,4 +42,3 @@ def decimalize(data):
             raise TypeError
     except TypeError:
         print("Sorry, the decimalize function accepts lists or tuples of numerics")
-    return

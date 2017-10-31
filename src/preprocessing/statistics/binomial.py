@@ -1,6 +1,7 @@
 from .choose import choose
 from .decimalize import decimalize
 
+
 def binom_single_calculation(k, n, p):
     # break the binomial distribution into three components
     # 1. n choose k
@@ -13,7 +14,8 @@ def binom_single_calculation(k, n, p):
     component_3 = pow((1 - p), (n - k))
 
     # return the product of the three components
-    return(float(component_1 * component_2 * component_3))
+    return float(component_1 * component_2 * component_3)
+
 
 def binomial(k, n, p):
     """
@@ -56,8 +58,8 @@ def binomial(k, n, p):
     p = decimalize(p)
 
     if type(k) in [int, float]:
-        return(binom_single_calculation(k, n, p))
+        return binom_single_calculation(k, n, p)
     elif type(k) in [list, tuple]:
         binom_distribution_list = [binom_single_calculation(value, n, p) for value in k]
 
-        return(binom_distribution_list)
+        return binom_distribution_list

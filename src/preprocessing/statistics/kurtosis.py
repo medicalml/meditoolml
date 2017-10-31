@@ -1,9 +1,10 @@
 # I need sane division that returns a float not int
 from __future__ import division
 
-from common_statistic import mean
-from decimalize import decimalize
-from preprocessing.src.statistics.sum import sum
+from .mean import mean
+from .decimalize import decimalize
+from .sum import kahan_sum
+
 
 def kurtosis(x):
     """
@@ -19,8 +20,8 @@ def kurtosis(x):
         .. math::
             \\frac{n(n+1)}{(n-1)(n-2)(n-3)}\\bigg{(}\\frac{s4}{V(x)^2}\\bigg{)} - 3 \\frac{(n-1)^2}{(n-2)(n-3)}
         Where
-        :math:`s2 = \\sum(X-\\bar{X})^2`
-        :math:`s4 = \\sum(X-\\bar{X})^4`
+        :math:`s2 = \\kahan_sum(X-\\bar{X})^2`
+        :math:`s4 = \\kahan_sum(X-\\bar{X})^4`
         :math:`V(x) = \\frac{s2}{n - 1}`
     Args:
         x: A list of numerical objects. This calculation requires **at least 4 observations**.
@@ -35,16 +36,14 @@ def kurtosis(x):
         >>> kurtosis([1, 2, 3]) # this kurtosis calculation requires at least 4 observations
     """
 
-    if type(x) in [int, float]:
-        return(None)
-    elif type(x) in [list, tuple] and len(x) < 5:
-        return(None)
+    if type(x) in [int, float] or type(x) in [list, tuple] and len(x) < 5:
+        return None
 
     n = len(x)
     mean_x = decimalize(mean(x))
 
-    s2 = sum([pow((value - mean_x), 2) for value in x])
-    s4 = sum([pow((value - mean_x), 4) for value in x])
+    s2 = kahan_sum([pow((value - mean_x), 2) for value in x])
+    s4 = kahan_sum([pow((value - mean_x), 4) for value in x])
     vx = s2 / (n - 1)
 
     component1 = ((n * (n + 1)) / ((n - 1) * (n - 2) * (n - 3)))
@@ -53,4 +52,4 @@ def kurtosis(x):
 
     component3 = (pow((n - 1), 2) / ((n - 2) * (n - 3)))
 
-    return((component1 * component2) - (3 * component3))
+    return (component1 * component2) - (3 * component3)
