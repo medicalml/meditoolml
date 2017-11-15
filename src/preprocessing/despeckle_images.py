@@ -46,11 +46,32 @@ def parse_images(input_folder_path, output_folder_path, window_size):
             print(e)
 
 
+def parse_all(input_folder_path, output_folder_path, window_size):
+    files = read_images_path(input_folder_path)
+    if not os.path.exists(output_folder_path):
+        os.makedirs(output_folder_path)
+    for file in tqdm.tqdm(files):
+        try:
+            img = cv2.imread(file, cv2.IMREAD_GRAYSCALE)
+            img = img.astype('float32')
+            img /= 255.
+            file_name = os.path.basename(file)
+            filtered = lee_filter(img, size=window_size)
+
+            cv2.imwrite(os.path.join(output_folder_path, file_name), filtered * 255)
+        except Exception as e:
+            print(e)
+
+
 parser = argparse.ArgumentParser()
 parser.add_argument('path', help='Path to folder with images')
 parser.add_argument('output_path', help='Path to output folder')
 parser.add_argument('-w', '--window', default=7, type=float, help='Filter window size')
+parser.add_argument('--parse_all', action='store_true', default=True, help='Whether use comparison with original or not')
 args = parser.parse_args()
 
 if __name__ == '__main__':
-    parse_images(args.path, args.output_path, args.window)
+    if args.parse_all:
+        parse_all(args.path, args.output_path, args.window)
+    else:
+        parse_images(args.path, args.output_path, args.window)
