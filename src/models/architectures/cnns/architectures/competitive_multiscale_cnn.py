@@ -8,10 +8,10 @@ class MaxOut(nn.Module):
         super().__init__()
 
     def forward(self, inputs):
-        cur_max = inputs[0]
+        current_max = inputs[0]
         for inp in inputs[1:]:
-            cur_max = torch.max(cur_max, inp)
-        return cur_max
+            current_max = torch.max(current_max, inp)
+        return current_max
 
 
 class ConvCompetitiveLayer(nn.Module):
@@ -19,8 +19,8 @@ class ConvCompetitiveLayer(nn.Module):
     def __init__(self, in_channels, nb_kernels, kernels_sizes):
         super(ConvCompetitiveLayer, self).__init__()
 
-        self.convs = [nn.Conv2d(in_channels, nb_kernels, k_sz, padding=k_sz//2)
-                      for k_sz in kernels_sizes]
+        self.convs = [nn.Conv2d(in_channels, nb_kernels, kernel_size, padding=kernel_size//2)
+                      for kernel_size in kernels_sizes]
 
         self.bnorms = [nn.BatchNorm2d(nb_kernels) for _ in kernels_sizes]
         self.maxout = MaxOut()
@@ -31,9 +31,17 @@ class ConvCompetitiveLayer(nn.Module):
 
 
 class CompetitiveMultiscaleCNN(nn.Module):
+    """Implementation of Multiscale Competitive CNN proposed in:
+        https://arxiv.org/abs/1511.05635
+    """
 
-    def __init__(self, in_channels):
+    def __init__(self, in_channels, avg_pool_size=3):
+        """Create MultiscaleCompetitiveCNN object accepting images with given number of channels.
 
+        :param in_channels: Number of channels in the input image. Image size is irrelevant.
+        :param avg_pool_size: Pool size for the last layer - Average Pooling
+            (see https://arxiv.org/abs/1511.05635 - pool size not specified in the paper).
+        """
         super(CompetitiveMultiscaleCNN, self).__init__()
 
         self.block0_layer_0 = ConvCompetitiveLayer(in_channels, 192, [1, 3, 5, 7])
@@ -54,12 +62,11 @@ class CompetitiveMultiscaleCNN(nn.Module):
         self.block2_layer_1 = ConvCompetitiveLayer(192, 192, [1, 3])
         self.block2_layer_2 = ConvCompetitiveLayer(192, 10, [1, 3])
 
-        self.block2_avgpool = nn.AvgPool2d(3)
+        self.block2_avgpool = nn.AvgPool2d(avg_pool_size)
 
         self.logsoftmax = nn.LogSoftmax(dim=1)
 
     def forward(self, x, return_logsoftmax=True):
-
         bl0_forw = self.block0_layer_2(self.block0_layer_1(self.block0_layer_0(x)))
         bl0_out = self.block0_dropout(self.block0_maxpool(bl0_forw))
 
