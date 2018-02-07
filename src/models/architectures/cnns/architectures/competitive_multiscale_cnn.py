@@ -35,12 +35,11 @@ class CompetitiveMultiscaleCNN(nn.Module):
         https://arxiv.org/abs/1511.05635
     """
 
-    def __init__(self, in_channels, avg_pool_size=3):
+    def __init__(self, in_channels, out_neurons):
         """Create MultiscaleCompetitiveCNN object accepting images with given number of channels.
 
         :param in_channels: Number of channels in the input image. Image size is irrelevant.
-        :param avg_pool_size: Pool size for the last layer - Average Pooling
-            (see https://arxiv.org/abs/1511.05635 - pool size not specified in the paper).
+        :param out_neurons: Length of output vector.
         """
         super(CompetitiveMultiscaleCNN, self).__init__()
 
@@ -60,9 +59,9 @@ class CompetitiveMultiscaleCNN(nn.Module):
 
         self.block2_layer_0 = ConvCompetitiveLayer(192, 192, [1, 3, 5, 7])
         self.block2_layer_1 = ConvCompetitiveLayer(192, 192, [1, 3])
-        self.block2_layer_2 = ConvCompetitiveLayer(192, 10, [1, 3])
+        self.block2_layer_2 = ConvCompetitiveLayer(192, out_neurons, [1, 3])
 
-        self.block2_avgpool = nn.AvgPool2d(avg_pool_size)
+        self.block2_avgpool = nn.AvgPool2d
 
         self.logsoftmax = nn.LogSoftmax(dim=1)
 
@@ -74,7 +73,8 @@ class CompetitiveMultiscaleCNN(nn.Module):
         bl1_out = self.block1_dropout(self.block1_maxpool(bl1_forw))
 
         bl2_forw = self.block2_layer_2(self.block2_layer_1(self.block2_layer_0(bl1_out)))
-        bl2_out = self.block2_avgpool(bl2_forw)
+        bl2_out = self.block2_avgpool(bl2_forw.shape[-2:])(bl2_forw)
+
         if return_logsoftmax:
             bl2_out = self.logsoftmax(bl2_out)
         return bl2_out.view(bl2_out.size()[0], -1)
