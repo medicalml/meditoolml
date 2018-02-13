@@ -1,3 +1,5 @@
 inspect
 numpy
 tensorflow
+torch
+torchvision
