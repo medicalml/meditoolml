@@ -9,6 +9,7 @@ __all__ = ['DPN', 'dpn131', 'dpn98', 'dpn92']
 def dpn92(input_shape, nb_classes, use_small_initial_convo=False):
     """
     Creates DPN-92 architecture according to https://arxiv.org/pdf/1707.01629.pdf.
+
     :param input_shape: Tuple in the form (input_channels, height, width).
     :param nb_classes: Number of output classes.
     :param use_small_initial_convo: Whether to use initial convo with kernel of size 3 or 7.
@@ -31,6 +32,7 @@ def dpn92(input_shape, nb_classes, use_small_initial_convo=False):
 def dpn98(input_shape, nb_classes, use_small_initial_convo=False):
     """
     Creates DPN-98 architecture according to https://arxiv.org/pdf/1707.01629.pdf.
+
     :param input_shape: Tuple in the form (input_channels, height, width).
     :param nb_classes: Number of output classes.
     :param use_small_initial_convo: Whether to use initial convo with kernel of size 3 or 7.
@@ -53,6 +55,7 @@ def dpn98(input_shape, nb_classes, use_small_initial_convo=False):
 def dpn131(input_shape, nb_classes, use_small_initial_convo=False):
     """
     Creates DPN-131 architecture according to https://arxiv.org/pdf/1707.01629.pdf.
+
     :param input_shape: Tuple in the form (input_channels, height, width).
     :param nb_classes: Number of output classes.
     :param use_small_initial_convo: Whether to use initial convo with kernel of size 3 or 7.
@@ -78,7 +81,7 @@ def _get_padding(kernel_size):
 
 def get_model_repr_and_params(model):
     output = [
-        # str(model),
+        str(model),
         'Weights: {}'.format(sum([np.product(p.size()) for p in model.parameters()]))
     ]
     return '\n'.join(output)
@@ -117,7 +120,7 @@ class _DpnBlock(nn.Module):
                  input_features,
                  output_filters,
                  interpolation_filters,
-                 k,
+                 width_factor,
                  groups,
                  stride=1,
                  project=False):
@@ -128,10 +131,10 @@ class _DpnBlock(nn.Module):
 
         if stride > 1 or project:
             self.proj = nn.Sequential(
-                _BnActConvo(input_features, interpolation_filters + 2 * k, 1, stride=stride)
+                _BnActConvo(input_features, interpolation_filters + 2 * width_factor, 1, stride=stride)
             )
         self.conv = nn.Sequential(
-            _BasicBlock(input_features, output_filters, interpolation_filters + k,
+            _BasicBlock(input_features, output_filters, interpolation_filters + width_factor,
                         3, groups=groups, stride=stride)
         )
         self.project = project
@@ -142,17 +145,17 @@ class _DpnBlock(nn.Module):
         if self.project or self.stride > 1:
             inputs = self.proj(inputs)
             x = self.conv(x)
-            res, den = inputs[:, :self.interpolation_filters], inputs[:, self.interpolation_filters:]
-            residual = res + x[:, :self.interpolation_filters]
-            dense = torch.cat([den, x[:, self.interpolation_filters:]], dim=1)
+            residual_branch, dense_branch = inputs[:, :self.interpolation_filters], inputs[:, self.interpolation_filters:]
+            residual = residual_branch + x[:, :self.interpolation_filters]
+            dense = torch.cat([dense_branch, x[:, self.interpolation_filters:]], dim=1)
             return residual, dense
         else:
-            res, den = inputs
+            residual_branch, dense_branch = inputs
             x = self.conv(inputs)
 
             residual = x[:, :self.interpolation_filters]
             dense = x[:, self.interpolation_filters:]
-            return residual + res, torch.cat([den, dense], dim=1)
+            return residual + residual_branch, torch.cat([dense_branch, dense], dim=1)
 
 
 class DPN(nn.Module):
@@ -169,6 +172,7 @@ class DPN(nn.Module):
         """
         Creates Dual Path Network according to https://arxiv.org/pdf/1707.01629.pdf. Standard defined structures are
         DPN-92, DPN-98 and DPN-131 (this one is very heavy ~79.5 x 10^6 params).
+
         :param input_shape: Input shape of the input tensor.
         :param init_filters: Number of filter in the initial convo.
             Typically, it is:
@@ -205,7 +209,7 @@ class DPN(nn.Module):
         last_filters = init_filters
 
         for nb_filters, reps, width_factor in zip(nb_filters_in_blocks, nb_repetitions, width_factors):
-            inside_filters, output_filters = nb_filters
+            output_filters, interpolation_filters = nb_filters
             for rep in range(reps):
                 if last_filters == init_filters:
                     project = True
@@ -218,15 +222,15 @@ class DPN(nn.Module):
                     stride = 1
                 dpn_blocks.append(_DpnBlock(
                     last_filters,
-                    inside_filters,
                     output_filters,
+                    interpolation_filters,
                     width_factor,
                     groups,
                     stride=stride,
                     project=project
                 ))
                 if project or stride > 1:
-                    last_filters = output_filters + 3 * width_factor
+                    last_filters = interpolation_filters + 3 * width_factor
                 else:
                     last_filters += width_factor
         self.dpn_block = nn.Sequential(*dpn_blocks)
@@ -251,8 +255,8 @@ class DPN(nn.Module):
             x = F.avg_pool2d(x, kernel_size=(x.size(2), x.size(3)), stride=1)
         else:
             # according https://arxiv.org/pdf/1707.01629.pdf appendix
-            x = 0.5 * F.avg_pool2d(x, kernel_size=(x.size(2), x.size(3)), stride=1) \
-                + 0.5 * F.max_pool2d(x, kernel_size=(x.size(2), x.size(3)), stride=1)
+            x = (0.5 * F.avg_pool2d(x, kernel_size=(x.size(2), x.size(3)), stride=1)
+                 + 0.5 * F.max_pool2d(x, kernel_size=(x.size(2), x.size(3)), stride=1))
         x = x.view(-1, x.size(1))
         x = self.classifier(x)
         return x
@@ -262,8 +266,6 @@ if __name__ == '__main__':
     # Just for testing purposes
     from torch.autograd import Variable
 
-    # model = dpn98((3, 224, 224), 1000)
     model = dpn98((3, 224, 224), 1000)
     print(get_model_repr_and_params(model))
-    # print(model)
     model.forward(Variable(torch.from_numpy(np.random.random([1, 3, 224, 224]).astype(np.float32))))
